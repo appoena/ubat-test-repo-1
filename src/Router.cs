@@ -239,7 +239,7 @@ public partial class Router : IComponent, IHandleAfterRender, IDisposable
             // and must abide by our syntax and behaviors.
             // Other routers must create their own abstractions to flow data from their SSR routing
             // scheme to their interactive router.
-            Log.NavigatingToComponent(_logger, endpointRouteData.PageType, locationPath, _baseUri);
+            _logger.LogDebug("NavigatingToComponent PageType {PageType} LocationPath {LocationPath}", endpointRouteData.PageType, locationPath);
             // Post process the entry to add Blazor specific behaviors:
             // - Add 'null' for unused route parameters.
             // - Convert constrained parameters with (int, double, etc) to the target type.
@@ -268,7 +268,7 @@ public partial class Router : IComponent, IHandleAfterRender, IDisposable
 
             activityHandle = RecordDiagnostics(context.Handler.FullName, context.Entry.RoutePattern.RawText);
 
-            Log.NavigatingToComponent(_logger, context.Handler, locationPath, _baseUri);
+            _logger.LogDebug("NavigatingToComponent HandlerType={HandlerType} LocationPath={LocationPath} BaseUri={BaseUri}", If(context.Handler?.GetType()?.FullName, String.Empty), locationPath, _baseUri)
 
             var routeData = new RouteData(
                 context.Handler,
@@ -289,7 +289,7 @@ public partial class Router : IComponent, IHandleAfterRender, IDisposable
             {
                 activityHandle = RecordDiagnostics("NotFound", "NotFound");
 
-                Log.DisplayingNotFound(_logger, locationPath, _baseUri);
+                _logger.LogInformation("DisplayingNotFound {LocationPath} {BaseUri}", locationPath, _baseUri)
 
                 // We did not find a Component that matches the route.
                 // Only show the NotFound content if the application developer programatically got us here i.e we did not
@@ -300,7 +300,7 @@ public partial class Router : IComponent, IHandleAfterRender, IDisposable
             {
                 activityHandle = RecordDiagnostics("External", "External");
 
-                Log.NavigatingToExternalUri(_logger, _locationAbsolute, locationPath, _baseUri);
+                _logger.LogInformation("NavigatingToExternalUri BaseUri={BaseUri} LocationPath={LocationPath}", _baseUri, locationPath);
                 NavigationManager.NavigateTo(_locationAbsolute, forceLoad: true);
             }
         }
@@ -403,7 +403,7 @@ public partial class Router : IComponent, IHandleAfterRender, IDisposable
                 args.Path = _notFoundPageRoute;
                 RenderNotFound();
             }
-            Log.DisplayingNotFound(_logger, args.Path);
+            _logger.LogWarning("DisplayingNotFound Path={Path}", args.Path);
         }
     }
 

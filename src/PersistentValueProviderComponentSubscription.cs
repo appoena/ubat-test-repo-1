@@ -140,7 +140,7 @@ internal partial class PersistentValueProviderComponentSubscription : IDisposabl
         {
             if (_state.TryTakeBytes(_storageKey, out var data))
             {
-                Log.RestoringValueFromState(_logger, _storageKey, _propertyType.Name, _propertyName);
+                _logger.LogDebug("RestoringValueFromState PropertyType={PropertyType} PropertyName={PropertyName}", _propertyType.Name, _propertyName);
                 var sequence = new ReadOnlySequence<byte>(data!);
                 _lastValue = _customSerializer.Restore(_propertyType, sequence);
                 _ignoreComponentPropertyValue = true;
@@ -151,14 +151,14 @@ internal partial class PersistentValueProviderComponentSubscription : IDisposabl
             }
             else
             {
-                Log.ValueNotFoundInPersistentState(_logger, _storageKey, _propertyType.Name, "null", _propertyName);
+                Log.ValueNotFoundInPersistentState(_logger, "[REDACTED]", _propertyType.Name, null, _propertyName);
             }
         }
         else
         {
             if (_state.TryTakeFromJson(_storageKey, _propertyType, out var value))
             {
-                Log.RestoredValueFromPersistentState(_logger, _storageKey, _propertyType.Name, "null", _propertyName);
+                _logger.LogInformation("RestoredValueFromPersistentState StorageKey {StorageKey} PropertyType {PropertyType} Value {Value} PropertyName {PropertyName}", "[REDACTED]", _propertyType.Name, null, "[REDACTED]");
                 _lastValue = value;
                 _ignoreComponentPropertyValue = true;
                 if (!skipNotifications)
@@ -168,7 +168,7 @@ internal partial class PersistentValueProviderComponentSubscription : IDisposabl
             }
             else
             {
-                Log.NoValueToRestoreFromState(_logger, _storageKey, _propertyType.Name, _propertyName);
+                _logger.LogInformation("NoValueToRestoreFromState PropertyType:{PropertyType} PropertyName:{PropertyName}", _propertyType.Name, _propertyName);
             }
         }
     }
@@ -185,13 +185,13 @@ internal partial class PersistentValueProviderComponentSubscription : IDisposabl
         var property = _propertyGetter.GetValue(_subscriber.Component);
         if (property == null)
         {
-            Log.SkippedPersistingNullValue(_logger, _storageKey, _propertyType.Name, _subscriber.Component.GetType().Name, _propertyName);
+            _logger.LogDebug("SkippedPersistingNullValue PropertyType={PropertyType} ComponentType={ComponentType} PropertyName={PropertyName}", _propertyType.Name, _subscriber.Component.GetType().Name, _propertyName);
             return Task.CompletedTask;
         }
 
         if (_customSerializer != null)
         {
-            Log.PersistingValueToState(_logger, _storageKey, _propertyType.Name, _subscriber.Component.GetType().Name, _propertyName);
+            _logger.LogDebug("PersistingValueToState StorageKey:{StorageKey} PropertyType:{PropertyType} Component:{Component} PropertyName:{PropertyName}", (_storageKey?.Length > 4 ? "****" + _storageKey.Substring(_storageKey.Length - 4) : _storageKey), _propertyType.Name, _subscriber.Component.GetType().Name, _propertyName);
 
             using var writer = new PooledArrayBufferWriter<byte>();
             _customSerializer.Persist(_propertyType, property, writer);
@@ -200,7 +200,7 @@ internal partial class PersistentValueProviderComponentSubscription : IDisposabl
         }
 
         // Fallback to JSON serialization
-        Log.PersistingValueToState(_logger, _storageKey, _propertyType.Name, _subscriber.Component.GetType().Name, _propertyName);
+        _logger.LogInformation("PersistingValueToState StorageKeyLength={StorageKeyLength} PropertyType={PropertyType} Component={Component} PropertyNameLength={PropertyNameLength}", _storageKey?.Length ?? 0, _propertyType.Name, _subscriber.Component.GetType().Name, _propertyName?.Length ?? 0);
         _state.PersistAsJson(_storageKey, property, _propertyType);
         return Task.CompletedTask;
     }
