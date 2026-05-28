@@ -140,7 +140,7 @@ internal partial class PersistentValueProviderComponentSubscription : IDisposabl
         {
             if (_state.TryTakeBytes(_storageKey, out var data))
             {
-                Log.RestoringValueFromState(_logger, _storageKey, _propertyType.Name, _propertyName);
+                _logger.LogDebug("RestoringValueFromState PropertyType {PropertyType}", _propertyType.Name);
                 var sequence = new ReadOnlySequence<byte>(data!);
                 _lastValue = _customSerializer.Restore(_propertyType, sequence);
                 _ignoreComponentPropertyValue = true;
@@ -151,14 +151,14 @@ internal partial class PersistentValueProviderComponentSubscription : IDisposabl
             }
             else
             {
-                Log.ValueNotFoundInPersistentState(_logger, _storageKey, _propertyType.Name, "null", _propertyName);
+                _logger.LogWarning("ValueNotFoundInPersistentState StorageKey={StorageKey} PropertyType={PropertyType} Value={Value} PropertyName={PropertyName}", _storageKey, _propertyType.Name, null, _propertyName)
             }
         }
         else
         {
             if (_state.TryTakeFromJson(_storageKey, _propertyType, out var value))
             {
-                Log.RestoredValueFromPersistentState(_logger, _storageKey, _propertyType.Name, "null", _propertyName);
+                Log.RestoredValueFromPersistentState(logger: _logger, storageKey: _storageKey, propertyTypeName: _propertyType.Name, value: null, propertyName: _propertyName);
                 _lastValue = value;
                 _ignoreComponentPropertyValue = true;
                 if (!skipNotifications)
@@ -168,7 +168,7 @@ internal partial class PersistentValueProviderComponentSubscription : IDisposabl
             }
             else
             {
-                Log.NoValueToRestoreFromState(_logger, _storageKey, _propertyType.Name, _propertyName);
+                _logger.LogDebug("NoValueToRestoreFromState StorageKeyHash={StorageKeyHash} PropertyType={PropertyType} PropertyName={PropertyName}", _storageKey?.GetHashCode(), _propertyType.Name, _propertyName);
             }
         }
     }
@@ -185,13 +185,13 @@ internal partial class PersistentValueProviderComponentSubscription : IDisposabl
         var property = _propertyGetter.GetValue(_subscriber.Component);
         if (property == null)
         {
-            Log.SkippedPersistingNullValue(_logger, _storageKey, _propertyType.Name, _subscriber.Component.GetType().Name, _propertyName);
+            _logger.LogWarning("Skipped persisting null value PropertyType={PropertyType} Component={Component} PropertyName={PropertyName}", _propertyType.Name, _subscriber.Component.GetType().Name, _propertyName);
             return Task.CompletedTask;
         }
 
         if (_customSerializer != null)
         {
-            Log.PersistingValueToState(_logger, _storageKey, _propertyType.Name, _subscriber.Component.GetType().Name, _propertyName);
+            _logger.LogDebug("PersistingValueToState StorageKey={StorageKey} PropertyType={PropertyType} Component={Component} PropertyName={PropertyName}", _storageKey != null && _storageKey.Length > 4 ? "****" + _storageKey.Substring(_storageKey.Length - 4) : _storageKey, _propertyType?.Name, _subscriber?.Component?.GetType()?.Name, _propertyName);
 
             using var writer = new PooledArrayBufferWriter<byte>();
             _customSerializer.Persist(_propertyType, property, writer);
@@ -200,7 +200,7 @@ internal partial class PersistentValueProviderComponentSubscription : IDisposabl
         }
 
         // Fallback to JSON serialization
-        Log.PersistingValueToState(_logger, _storageKey, _propertyType.Name, _subscriber.Component.GetType().Name, _propertyName);
+        _logger.LogInformation("PersistingValueToState StorageKey={StorageKey} PropertyType={PropertyType} ComponentName={ComponentName} PropertyName={PropertyName}", _storageKey, _propertyType.Name, _subscriber.Component.GetType().Name, _propertyName);
         _state.PersistAsJson(_storageKey, property, _propertyType);
         return Task.CompletedTask;
     }

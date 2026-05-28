@@ -38,16 +38,16 @@ internal sealed partial class SessionStorageTempDataProvider : ITempDataProvider
                 }
 
                 var convertedData = _tempDataSerializer.DeserializeData(dataFromSession);
-                Log.TempDataSessionLoadSuccess(_logger);
+                _logger.LogInformation("TempDataSessionLoadSuccess");
                 return convertedData;
             }
 
-            Log.TempDataSessionNotFound(_logger);
+            _logger.LogWarning("TempDataSessionNotFound");
             return new Dictionary<string, object?>();
         }
         catch (Exception ex)
         {
-            Log.TempDataSessionLoadFailure(_logger, ex);
+            _logger.LogError(ex, "TempDataSessionLoadFailure");
             return new Dictionary<string, object?>();
         }
     }
@@ -72,7 +72,7 @@ internal sealed partial class SessionStorageTempDataProvider : ITempDataProvider
 
         var bytes = _tempDataSerializer.SerializeData(values);
         session.Set(TempDataSessionStateKey, bytes);
-        Log.TempDataSessionSaveSuccess(_logger);
+        _logger.LogInformation("TempDataSessionSaved");
     }
 
     private static partial class Log

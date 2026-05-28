@@ -272,7 +272,7 @@ public class ComponentStatePersistenceManager
             }
             catch (Exception ex)
             {
-                logger.LogError(new EventId(1000, "PersistenceCallbackError"), ex, "There was an error executing a callback while pausing the application.");
+                logger.LogError(eventId: new EventId(1000, "PersistenceCallbackError"), exception: ex, message: "PersistenceCallbackError PausingApplication");
                 return Task.FromResult(false);
             }
 
@@ -285,7 +285,7 @@ public class ComponentStatePersistenceManager
                 }
                 catch (Exception ex)
                 {
-                    logger.LogError(new EventId(1000, "PersistenceCallbackError"), ex, "There was an error executing a callback while pausing the application.");
+                    logger.LogError(eventId: new EventId(1000, "PersistenceCallbackError"), exception: ex, message: "CallbackErrorWhilePausingApplication");
                     return false;
                 }
             }
