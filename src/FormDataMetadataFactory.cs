@@ -45,7 +45,7 @@ internal partial class FormDataMetadataFactory(List<IFormDataConverterFactory> f
                 // the type graph.
                 if (shouldClearContext)
                 {
-                    Log.StartResolveMetadataGraph(_logger, type);
+                    _logger.LogInformation("StartResolveMetadataGraph {Type}", type);
                     _context.BeginResolveGraph();
                 }
 
@@ -53,17 +53,17 @@ internal partial class FormDataMetadataFactory(List<IFormDataConverterFactory> f
                 var result = _context.TypeMetadata.TryGetValue(type, out var value) ? value : new FormDataTypeMetadata(type);
                 if (value == null)
                 {
-                    Log.NoMetadataFound(_logger, type);
+                    Log.NoMetadataFound(_logger, type?.Name ?? "UnknownType");
                     _context.TypeMetadata[type] = result;
                 }
                 else
                 {
-                    Log.MetadataFound(_logger, type);
+                    _logger.LogInformation("MetadataFound {Type}", type);
                 }
 
                 if (type.IsGenericTypeDefinition)
                 {
-                    Log.GenericTypeDefinitionNotSupported(_logger, type);
+                    _logger.LogWarning("Generic type definition not supported {Type}", type);
                     _context.TypeMetadata.Remove(type);
                     return null;
                 }
@@ -101,7 +101,7 @@ internal partial class FormDataMetadataFactory(List<IFormDataConverterFactory> f
 
                 if (_dictionaryFactory.CanConvert(type, options))
                 {
-                    Log.DictionaryType(_logger, type);
+                    _logger.LogInformation("DictionaryType {Type}", type);
                     result.Kind = FormDataTypeKind.Dictionary;
                     var (keyType, valueType) = DictionaryConverterFactory.ResolveDictionaryTypes(type)!;
                     result.KeyType = GetOrCreateMetadataFor(keyType, options);
@@ -111,13 +111,13 @@ internal partial class FormDataMetadataFactory(List<IFormDataConverterFactory> f
 
                 if (_collectionFactory.CanConvert(type, options))
                 {
-                    Log.CollectionType(_logger, type);
+                    _logger.LogDebug("CollectionType {Type}", type);
                     result.Kind = FormDataTypeKind.Collection;
                     result.ElementType = GetOrCreateMetadataFor(CollectionConverterFactory.ResolveElementType(type)!, options);
                     return result;
                 }
 
-                Log.ObjectType(_logger, type);
+                _logger.LogInformation("ObjectType {ObjectType}", type);
                 result.Kind = FormDataTypeKind.Object;
                 _context.Track(type);
                 var constructors = type.GetConstructors();
@@ -127,7 +127,7 @@ internal partial class FormDataMetadataFactory(List<IFormDataConverterFactory> f
                     result.Constructor = constructors[0];
                     if (type.IsAbstract)
                     {
-                        Log.AbstractClassesNotSupported(_logger, type);
+                        _logger.LogWarning("AbstractClassesNotSupported {Type}", type);
                         _context.TypeMetadata.Remove(type);
                         return null;
                     }
@@ -135,22 +135,22 @@ internal partial class FormDataMetadataFactory(List<IFormDataConverterFactory> f
                 else if (constructors.Length > 1)
                 {
                     // We can't select the constructor when there are multiple of them.
-                    Log.MultiplePublicConstructorsFound(_logger, type);
+                    _logger.LogWarning("MultiplePublicConstructorsFound Type {Type}", type)
                     return null;
                 }
                 else if (!type.IsValueType)
                 {
                     if (type.IsInterface)
                     {
-                        Log.InterfacesNotSupported(_logger, type);
+                        _logger.LogWarning("InterfacesNotSupported {Type}", type);
                     }
                     else if (type.IsAbstract)
                     {
-                        Log.AbstractClassesNotSupported(_logger, type);
+                        _logger.LogWarning("AbstractClassesNotSupported {Type}", type)
                     }
                     else
                     {
-                        Log.NoPublicConstructorFound(_logger, type);
+                        _logger.LogWarning("NoPublicConstructorFound {Type}", type?.Name);
                     }
 
                     _context.TypeMetadata.Remove(type);
@@ -163,18 +163,18 @@ internal partial class FormDataMetadataFactory(List<IFormDataConverterFactory> f
                     if (_logger.IsEnabled(LogLevel.Debug))
                     {
                         var parameters = $"({string.Join(", ", result.Constructor.GetParameters().Select(p => p.ParameterType.Name))})";
-                        Log.ConstructorFound(_logger, type, parameters);
+                        _logger.LogDebug("ConstructorFound Type={Type} Parameters={Parameters}", type, parameters);
                     }
 
                     var values = result.Constructor.GetParameters();
 
                     foreach (var parameter in values)
                     {
-                        Log.ConstructorParameter(_logger, type, parameter.Name!, parameter.ParameterType);
+                        _logger.LogDebug("ConstructorParameter {ParameterName} {ParameterType} {DeclaringType}", parameter.Name!, parameter.ParameterType, type);
                         var parameterTypeInfo = GetOrCreateMetadataFor(parameter.ParameterType, options);
                         if (parameterTypeInfo == null)
                         {
-                            Log.ConstructorParameterTypeNotSupported(_logger, type, parameter.Name!, parameter.ParameterType);
+                            _logger.LogWarning("ConstructorParameterTypeNotSupported Type={Type} ParameterName={ParameterName} ParameterType={ParameterType}", type, parameter.Name!, parameter.ParameterType);
                             _context.TypeMetadata.Remove(type);
                             return null;
                         }
@@ -187,18 +187,18 @@ internal partial class FormDataMetadataFactory(List<IFormDataConverterFactory> f
                 foreach (var propertyHelper in candidateProperty)
                 {
                     var property = propertyHelper.Property;
-                    Log.CandidateProperty(_logger, propertyHelper.Name, property.PropertyType);
+                    _logger.LogDebug("CandidateProperty {PropertyName} {PropertyType}", propertyHelper.Name, property.PropertyType);
                     var matchingConstructorParameter = result
                         .ConstructorParameters
                         .FirstOrDefault(p => string.Equals(p.Name, property.Name, StringComparison.OrdinalIgnoreCase));
 
                     if (matchingConstructorParameter != null)
                     {
-                        Log.MatchingConstructorParameterFound(_logger, matchingConstructorParameter.Name, property.Name);
+                        _logger.LogDebug("MatchingConstructorParameterFound MatchingConstructorParameter {MatchingConstructorParameter} Property {PropertyName}", matchingConstructorParameter.Name, property.Name)
                         var dataMember = property.GetCustomAttribute<DataMemberAttribute>();
                         if (dataMember != null && dataMember.IsNameSetExplicitly && dataMember.Name != null)
                         {
-                            Log.CustomParameterNameMetadata(_logger, dataMember.Name, property.Name);
+                            _logger.LogDebug("CustomParameterNameMetadata DataMember {DataMemberName} Property {PropertyName}", dataMember.Name, property.Name)
                             matchingConstructorParameter.Name = dataMember.Name;
                         }
 
@@ -209,14 +209,14 @@ internal partial class FormDataMetadataFactory(List<IFormDataConverterFactory> f
                     var ignoreDataMember = property.GetCustomAttribute<IgnoreDataMemberAttribute>();
                     if (ignoreDataMember != null)
                     {
-                        Log.IgnoredProperty(_logger, property.Name);
+                        _logger.LogDebug("Ignored property {PropertyName}", property.Name)
                         // The propertyHelper is marked as ignored, we don't need to add it.
                         continue;
                     }
 
                     if (property.SetMethod == null || !property.SetMethod.IsPublic)
                     {
-                        Log.NonPublicSetter(_logger, property.Name);
+                        _logger.LogDebug("NonPublicSetter {PropertyName}", property.Name);
                         // The property is readonly, we don't need to add it.
                         continue;
                     }
@@ -224,7 +224,7 @@ internal partial class FormDataMetadataFactory(List<IFormDataConverterFactory> f
                     var propertyTypeInfo = GetOrCreateMetadataFor(property.PropertyType, options);
                     if (propertyTypeInfo == null)
                     {
-                        Log.PropertyTypeNotSupported(_logger, type, property.Name, property.PropertyType);
+                        Log.PropertyTypeNotSupported(_logger, type, string.IsNullOrEmpty(property.Name) ? property.Name : char.ToUpperInvariant(property.Name[0]) + property.Name.Substring(1), property.PropertyType?.Name);
                         _context.TypeMetadata.Remove(type);
                         return null;
                     }
@@ -233,23 +233,23 @@ internal partial class FormDataMetadataFactory(List<IFormDataConverterFactory> f
                     var dataMemberAttribute = property.GetCustomAttribute<DataMemberAttribute>();
                     if (dataMemberAttribute != null && dataMemberAttribute.IsNameSetExplicitly && dataMemberAttribute.Name != null)
                     {
-                        Log.CustomParameterNameMetadata(_logger, dataMemberAttribute.Name, property.Name);
+                        _logger.LogDebug("CustomParameterNameMetadata DataMemberName={DataMemberName} PropertyName={PropertyName}", dataMemberAttribute.Name, property.Name);
                         propertyInfo.Name = dataMemberAttribute.Name;
                         propertyInfo.Required = dataMemberAttribute.IsRequired;
-                        Log.PropertyRequired(_logger, propertyInfo.Name);
+                        _logger.LogWarning("PropertyRequired {PropertyName}", propertyInfo.Name);
                     }
 
                     var requiredAttribute = property.GetCustomAttribute<RequiredMemberAttribute>();
                     if (requiredAttribute != null)
                     {
                         propertyInfo.Required = true;
-                        Log.PropertyRequired(_logger, propertyInfo.Name);
+                        _logger.LogWarning("PropertyRequired {PropertyName}", propertyInfo.Name);
                     }
 
                     result.Properties.Add(propertyInfo);
                 }
 
-                Log.MetadataComputed(_logger, type);
+                _logger.LogInformation("MetadataComputed Type:{Type}", type);
                 return result;
             }
             finally
@@ -257,7 +257,7 @@ internal partial class FormDataMetadataFactory(List<IFormDataConverterFactory> f
                 _context.Untrack(type);
                 if (shouldClearContext)
                 {
-                    Log.EndResolveMetadataGraph(_logger, type);
+                    _logger.LogDebug("EndResolveMetadataGraph {Type}", type);
                     _context.EndResolveGraph();
                 }
             }
@@ -305,7 +305,7 @@ internal partial class FormDataMetadataFactory(List<IFormDataConverterFactory> f
             if (_logger.IsEnabled(LogLevel.Debug))
             {
                 var chain = string.Join(" -> ", _context.CurrentTypes.Append(type).Select(t => t.Name));
-                Log.RecursiveTypeFound(_logger, type, chain);
+                Log.RecursiveTypeFound(_logger, ``type``, chain);
             }
         }
     }
